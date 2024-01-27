@@ -1,3 +1,0 @@
-/Users/darnelo/heap/build/CMakeFiles/heap.dir
-/Users/darnelo/heap/build/CMakeFiles/edit_cache.dir
-/Users/darnelo/heap/build/CMakeFiles/rebuild_cache.dir
