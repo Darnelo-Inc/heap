@@ -73,6 +73,19 @@ void *heap_alloc(size_t size) {
     return (void*)(((char*)chunk) + sizeof(struct heapchunk_t));
 }
 
+heap_e heap_free(void* data) {
+    struct heapchunk_t *chunk = &((struct heapchunk_t*)(data))[-1];
+    printf("chunk->size: %d\n", chunk->size);
+    
+    struct heapchunk_t *oldfirst = heap.start;
+    heap.start = chunk;
+    
+    chunk->next = oldfirst;    
+    chunk->inuse = false;
+    
+    return HEAP_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     if(init_heap(&heap) == HEAP_FAILURE) {
         printf("Failed to init heap\n");
@@ -80,7 +93,12 @@ int main(int argc, char *argv[]) {
     }
 
     char *mystr = heap_alloc(32);
-    strncpy(mystr, "abob", 32);    
-    
+    strncpy(mystr, "abob-1", 32);    
+    heap_free(mystr);
+
+    mystr = heap_alloc(32);
+    strncpy(mystr, "abob-2", 32);
+    heap_free(mystr);
+
 	return 0;
 }
