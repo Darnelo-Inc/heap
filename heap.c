@@ -10,6 +10,7 @@ typedef enum {
 } heap_e;
 
 struct heapchunk_t {
+    int prevsize;
     int size;
     bool inuse;
     struct heapchunk_t *next;
@@ -34,7 +35,8 @@ heap_e init_heap(struct heapinfo_t *heap) {
     struct heapchunk_t *first = (struct heapchunk_t*)(start);
     first->size = getpagesize() - sizeof(struct heapchunk_t);
     first->inuse = false;
-    first->next = NULL;    
+    first->next = NULL;
+    first->prevsize = 0;    
 
     heap->start = first;
     heap->avail = first->size;
@@ -66,9 +68,14 @@ void *heap_alloc(size_t size) {
     chunk->size = size;
     chunk->inuse = true;
 
-    void *next = (((char*)chunk) + size);
+    struct heapchunk_t *next = (struct heapchunk_t*)(((char*)chunk) + size);
 
     heap.start = next;
+    heap.avail -= (sizeof(struct heapchunk_t) + size);
+    
+    printf("Setting %p->prevsize to %d\n", next, size);
+    next->size = heap.avail;    
+    next->prevsize = size;
 
     return (void*)(((char*)chunk) + sizeof(struct heapchunk_t));
 }
@@ -77,6 +84,16 @@ heap_e heap_free(void* data) {
     struct heapchunk_t *chunk = &((struct heapchunk_t*)(data))[-1];
     printf("chunk->size: %d\n", chunk->size);
     
+    struct heapchunk_t *prevchunk = NULL;
+    if(chunk->prevsize) {
+        prevchunk = (struct heapchunk_t*)((char*)chunk) - chunk->prevsize - sizeof(struct heapchunk_t);
+    }
+
+    if(prevchunk) {
+        printf("Prev in use? %d\n", prevchunk->inuse);
+    }
+
+
     struct heapchunk_t *oldfirst = heap.start;
     heap.start = chunk;
     
@@ -87,18 +104,18 @@ heap_e heap_free(void* data) {
 }
 
 int main(int argc, char *argv[]) {
-    if(init_heap(&heap) == HEAP_FAILURE) {
+     printf("heap.start: %d, heap.avail: %d\n", heap.start, heap.avail);
+
+     if(init_heap(&heap) == HEAP_FAILURE) {
         printf("Failed to init heap\n");
         return -1;
     }
+    
+    char *a = heap_alloc(32);
+    char *b = heap_alloc(32);
 
-    char *mystr = heap_alloc(32);
-    strncpy(mystr, "abob-1", 32);    
-    heap_free(mystr);
-
-    mystr = heap_alloc(32);
-    strncpy(mystr, "abob-2", 32);
-    heap_free(mystr);
+    heap_free(a);
+    heap_free(b);    
 
 	return 0;
 }
