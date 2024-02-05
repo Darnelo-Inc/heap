@@ -81,25 +81,28 @@ void *heap_alloc(size_t size) {
 }
 
 heap_e heap_free(void* data) {
-    struct heapchunk_t *chunk = &((struct heapchunk_t*)(data))[-1];
+    struct heapchunk_t *chunk = &((struct heapchunk_t*)data)[-1];
     printf("chunk->size: %d\n", chunk->size);
     
     struct heapchunk_t *prevchunk = NULL;
     if(chunk->prevsize) {
-        prevchunk = (struct heapchunk_t*)((char*)chunk) - chunk->prevsize - sizeof(struct heapchunk_t);
+        printf("prevsize: %d\n", chunk->prevsize);
+        prevchunk = (struct heapchunk_t*)(((char*)chunk) - chunk->prevsize);
     }
 
-    if(prevchunk) {
-        printf("Prev in use? %d\n", prevchunk->inuse);
+    if(prevchunk && !prevchunk->inuse) {
+        printf("The chunk behind us is freeeee\n");
+        prevchunk->size = (chunk->size) + sizeof(struct heapchunk_t);
+        struct heapchunk_t *oldfirst = heap.start;
+        heap.start = prevchunk;
+        prevchunk->next = oldfirst; 
+    } else {
+        struct heapchunk_t *oldfirst = heap.start;
+        heap.start = chunk;
+        chunk->next = oldfirst;    
+        chunk->inuse = false;
     }
 
-
-    struct heapchunk_t *oldfirst = heap.start;
-    heap.start = chunk;
-    
-    chunk->next = oldfirst;    
-    chunk->inuse = false;
-    
     return HEAP_SUCCESS;
 }
 
@@ -112,10 +115,19 @@ int main(int argc, char *argv[]) {
     }
     
     char *a = heap_alloc(32);
+    printf("Got %p for a\n", a);
+
     char *b = heap_alloc(32);
+    printf("Got %p for b\n", b);
 
     heap_free(a);
     heap_free(b);    
+
+    char *c = heap_alloc(64);
+    printf("Got %p for c\n", c);
+    
+    char *d = heap_alloc(64);
+    printf("Got %p for d\n", d);
 
 	return 0;
 }
