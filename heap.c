@@ -30,8 +30,6 @@ heap_e init_heap(struct heapinfo_t *heap) {
         return HEAP_FAILURE;
     }
     
-    printf("%p\n", start);    
-    
     struct heapchunk_t *first = (struct heapchunk_t*)(start);
     first->size = getpagesize() - sizeof(struct heapchunk_t);
     first->inuse = false;
@@ -63,17 +61,14 @@ void *heap_alloc(size_t size) {
         return (void*)-1;
     }
 
-    printf("Found chunk: %p\n", chunk);
-
     chunk->size = size;
     chunk->inuse = true;
 
-    struct heapchunk_t *next = (struct heapchunk_t*)(((char*)chunk) + size);
+    struct heapchunk_t *next = (struct heapchunk_t*)(((char*)chunk) + sizeof(struct heapchunk_t) + size);
 
     heap.start = next;
     heap.avail -= (sizeof(struct heapchunk_t) + size);
     
-    printf("Setting %p->prevsize to %d\n", next, size);
     next->size = heap.avail;    
     next->prevsize = size;
 
@@ -82,52 +77,50 @@ void *heap_alloc(size_t size) {
 
 heap_e heap_free(void* data) {
     struct heapchunk_t *chunk = &((struct heapchunk_t*)data)[-1];
-    printf("chunk->size: %d\n", chunk->size);
     
     struct heapchunk_t *prevchunk = NULL;
     if(chunk->prevsize) {
-        printf("prevsize: %d\n", chunk->prevsize);
-        prevchunk = (struct heapchunk_t*)(((char*)chunk) - chunk->prevsize);
+        prevchunk = (struct heapchunk_t*)(((char*)chunk) - chunk->prevsize - sizeof(struct heapchunk_t));
     }
 
     if(prevchunk && !prevchunk->inuse) {
-        printf("The chunk behind us is freeeee\n");
-        prevchunk->size = (chunk->size) + sizeof(struct heapchunk_t);
+        prevchunk->size += (chunk->size) + sizeof(struct heapchunk_t);
         struct heapchunk_t *oldfirst = heap.start;
         heap.start = prevchunk;
-        prevchunk->next = oldfirst; 
+        prevchunk->next = oldfirst;
+        heap.avail += chunk->size + sizeof(struct heapchunk_t); 
     } else {
         struct heapchunk_t *oldfirst = heap.start;
         heap.start = chunk;
         chunk->next = oldfirst;    
-        chunk->inuse = false;
+        heap.avail += chunk->size;
     }
 
+    chunk->inuse = false;
+    
     return HEAP_SUCCESS;
 }
 
 int main(int argc, char *argv[]) {
-     printf("heap.start: %d, heap.avail: %d\n", heap.start, heap.avail);
-
-     if(init_heap(&heap) == HEAP_FAILURE) {
+    if(init_heap(&heap) == HEAP_FAILURE) {
         printf("Failed to init heap\n");
         return -1;
     }
     
+    printf("start avail: %x\n", heap.avail);
+
     char *a = heap_alloc(32);
-    printf("Got %p for a\n", a);
-
     char *b = heap_alloc(32);
-    printf("Got %p for b\n", b);
-
-    heap_free(a);
-    heap_free(b);    
-
-    char *c = heap_alloc(64);
-    printf("Got %p for c\n", c);
+    char *c = heap_alloc(32);
+    char *d = heap_alloc(32);
     
-    char *d = heap_alloc(64);
-    printf("Got %p for d\n", d);
-
-	return 0;
+    heap_free(b);
+    heap_free(c);
+    heap_free(a);
+    heap_free(d);
+    
+    printf("finish avail: %x\n", heap.avail);    
+    printf("expected start-40-40-40-40+20+40+20+40==finish\n");
+	
+    return 0;
 }
